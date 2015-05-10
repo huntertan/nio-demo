@@ -63,18 +63,31 @@ public class NIOService {
                     }if(key.isReadable()) {
                         //返回为之创建的socket通道
                         SocketChannel channel = (SocketChannel)key.channel();
+                        //清空buffer
+                        receiveBuffer.clear();
                         int count = channel.read(receiveBuffer);
                         if(count > 0) {
                             String receiveText = new String(receiveBuffer.array(),0,count);
+                            //在发送的buffer中存入收到的内容
+                            sendBuffer.put(receiveBuffer.array());
                             //设置监听的消息包括写消息
                             key.interestOps(SelectionKey.OP_WRITE | SelectionKey.OP_WRITE);
-                        } else if(count == -1){//socket已经断开
+                        } else if(count < 0){//socket已经断开,count == -1
                             channel.close();
                         }
                     }
                     //在网络不阻塞的情况下，socket都是可写的
                     if(key.isWritable()) {
+                        //保证缓存的可读性
+                        sendBuffer.clear();
+                        //保证buffer的可读性
+                        sendBuffer.flip();
+                        SocketChannel socketChannel = (SocketChannel) key.channel();
                         //do something
+                        while(receiveBuffer.hasRemaining()) {
+                            socketChannel.write(receiveBuffer);
+                        }
+                        receiveBuffer.clear();
                     }
                 }
             }
